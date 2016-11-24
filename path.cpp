@@ -74,7 +74,7 @@ void dijkstra(double graph[V][V], int src, int p[V][V], int dist[V])
 		for (int v = 0; v < V; v++)
 
 			if (!sptSet[v] && graph[u][v] &&
-				dist[u] + graph[u][v] <= dist[v])
+				dist[u] + graph[u][v] < dist[v])
 			{
 				parent[v] = u;
 				dist[v] = dist[u] + graph[u][v];
@@ -198,7 +198,7 @@ void separatezeroes(double pathMatrix[V][V][V])
 	}
 }
 
-void calculateEdgeTraffic(double EdgeTraffic[V][V], double pathMatrix[V][V][V], double graph[V][V], double flow[V][V])
+void calculateEdgeTraffic(double EdgeTraffic[V][V], double pathMatrix[V][V][V], double graph[V][V], double flow[V][V], double residualMatrix[V][V], double capacity[V][V])
 {
 	for (int i = 0; i < V;i++) {
 		for (int j = 0;j < V;j++) {
@@ -217,18 +217,133 @@ void calculateEdgeTraffic(double EdgeTraffic[V][V], double pathMatrix[V][V][V], 
 			}
 		}
 	}
+
+	for (int i = 0; i < V; i++) {
+		for (int j = 0;j < V;j++) {
+			if (EdgeTraffic[i][j] > capacity[i][j]) {
+				residualMatrix[i][j] = EdgeTraffic[i][j] - capacity[i][j];
+				EdgeTraffic[i][j] = capacity[i][j];
+			}
+		}
+	}
 }
 
 void calculateWeightedMatrixG(double graph[V][V], double EdgeTraffic[V][V], double capacity[V][V], double weightedMatrixG[V][V])
 {
 	for (int i = 0;i < V; i++) {
 		for (int j = 0; j < V;j++) {
-			if (EdgeTraffic[i][j] > capacity[i][j]) {
+			if (EdgeTraffic[i][j] >= capacity[i][j]) {
 				weightedMatrixG[i][j] = 0;
 			}
 			else {
 				int c = capacity[i][j] + 1;
 				weightedMatrixG[i][j] = ((double) c/((double) (c - EdgeTraffic[i][j])))*graph[i][j];
+			}
+		}
+	}
+}
+
+void calculatePredictedMatrix(double graph[V][V], double predictedMatrix[V][V])
+{
+	for (int i = 0; i < V;i++) {
+		for (int j = 0;j < V;j++) {
+			predictedMatrix[i][j] = (graph[i][j] + ((double) graph[i][j]*0.1));
+		}
+	}
+}
+
+void calcualteNewFlowMatrix(double flow[V][V], double newFlowMatrix[V][V], double percent)
+{
+	for (int i = 0; i < V;i++) {
+		for (int j = 0;j < V;j++) {
+			newFlowMatrix[i][j] = flow[i][j]*percent;
+		}
+	}
+}
+
+void calcualteActualPathDelay(double weightedMatrixG[V][V], double pathMatrix[V][V][V], double actualPathDelayMatrix[V][V])
+{
+	for (int i = 0; i < V; i++) {
+		for (int j = 0; j < V; j++) {
+			if (i != j) {
+				for (int k = 0;k < V - 1;k++) {
+					if ((int) pathMatrix[i][j][k + 1] != 0) {
+						actualPathDelayMatrix[i][j] = actualPathDelayMatrix[i][j] + weightedMatrixG[((int) pathMatrix[i][j][k]) - 1][((int) pathMatrix[i][j][k+1]) - 1];
+						if (i == 0 && j == 2) {
+							cout << actualPathDelayMatrix[i][j] << pathMatrix[i][j][k] << pathMatrix[i][j][k+1];
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void updateEdgeTraffic(double graph[V][V], double EdgeTraffic[V][V], double capacity[V][V], double residualMatrix[V][V], double weightedMatrixG[V][V], double weightedMatrixPath[V][V][V], double updatedShortestPath[V][V], double pathMatrix[V][V][V], double actualPathDelayMatrix[V][V])
+{
+	for (int it1 = 0; it1 < V;it1++) {
+		for (int it2 = 0; it2 < V; it2++) {
+			for (int it3 = 0; it3 < V;it3++) {
+				weightedMatrixPath[it1][it2][it3] = pathMatrix[it1][it2][it3];
+			}
+		}
+	}
+	calculateWeightedMatrixG(graph, EdgeTraffic, capacity, weightedMatrixG);
+	cout << " aad" << weightedMatrixG[1][5];
+	double tmpG[V][V] = {0};
+
+	for (int it4 = 0; it4 < V;it4++) {
+		for (int it5 = 0; it5 < V; it5++) {
+			tmpG[it4][it5] = weightedMatrixG[it4][it5];
+		}
+	}
+
+	/*setSource(weightedMatrixPath);
+	reversePathMatrix(weightedMatrixPath);
+	separatezeroes(weightedMatrixPath);
+	cout << " dsgsgdhg \n";
+	printPathMatrix(weightedMatrixPath);*/
+	for (int it1 = 0; it1 < V;it1++) {
+		for (int it2 = 0; it2 < V;it2++) {
+			int x = residualMatrix[it1][it2];
+			if (x > 0) {
+				while (x > 0) {
+					
+
+					for (int i = 0; i < V;i++) {
+						int p[V][V]={0};
+						int dist[V]={0};
+						dijkstra(tmpG, i, p, dist);
+
+						for (int j = 0;j < V;j++) {
+							for (int k = 0; k < V;k++) {
+								weightedMatrixPath[i][j][k] = p[j][k];
+							}
+						}
+
+						for (int j = 0; j < V;j++) {
+							updatedShortestPath[i][j] = dist[j];
+						}
+					}
+
+					setSource(weightedMatrixPath);
+					reversePathMatrix(weightedMatrixPath);
+					separatezeroes(weightedMatrixPath);
+					cout << " dsgsgdhg \n";
+					printPathMatrix(weightedMatrixPath);
+					for (int it3 = 0; it3 < V - 1;it3++) {
+						if (((int) weightedMatrixPath[it1][it2][it3 + 1]) != 0) {
+							int tmp = EdgeTraffic[(int) weightedMatrixPath[it1][it2][it3] -1][(int) weightedMatrixPath[it1][it2][it3 + 1] - 1];
+							EdgeTraffic[(int) weightedMatrixPath[it1][it2][it3] -1][(int) weightedMatrixPath[it1][it2][it3 + 1] - 1] = tmp + 1;
+							cout << weightedMatrixPath[it1][it2][it3] << " " << weightedMatrixPath[it1][it2][it3 + 1]<< " ";
+						}
+					}
+					cout << endl;
+					x--;
+					residualMatrix[it1][it2] = x;
+					calculateWeightedMatrixG(tmpG, EdgeTraffic, capacity, weightedMatrixG);
+					//cout << weightedMatrixG[it1][it2]<< endl;
+				}
 			}
 		}
 	}
@@ -262,8 +377,12 @@ int main()
 	double hopCount[V][V] = {0};
 	double EdgeTraffic[V][V] = {0.0};
 	double weightedMatrixG[V][V] = {0.0};
-	double weightedMatrixShort[V][V] = {0.0};
+	double actualPathDelayMatrix[V][V] = {0.0};
 	double weightedMatrixPath[V][V][V] = {0};
+	double predictedMatrix[V][V] = {0};
+	double newFlowMatrix[V][V] = {0};
+	double residualMatrix[V][V]= {0};
+	double updatedShortestPath[V][V] = {0};
 
 	for (int i = 0; i < V;i++) {
 		int p[V][V]={0};
@@ -289,8 +408,8 @@ int main()
 
 	setSource(pathMatrix);
 	reversePathMatrix(pathMatrix);
-
 	separatezeroes(pathMatrix);
+
 	cout <<"Path matrix: \n";
 	printPathMatrix(pathMatrix);
 
@@ -301,7 +420,7 @@ int main()
 	cout << "Flow Matrix: \n";
 	printMatrix(flow);
 
-	calculateEdgeTraffic(EdgeTraffic, pathMatrix, graph, flow);
+	calculateEdgeTraffic(EdgeTraffic, pathMatrix, graph, flow, residualMatrix, capacity);
 	cout << "Edge Traffic: \n";
 	printMatrix(EdgeTraffic);
 
@@ -312,26 +431,34 @@ int main()
 	cout <<"Weighted matrix: \n";
 	printMatrixDouble(weightedMatrixG);
 
-	for (int i = 0; i < V;i++) {
-		int p[V][V]={0};
-		int dist[V]={0};
-		dijkstra(weightedMatrixG, i, p, dist);
+	/*cout << "Actual path delay: \n";
+	calcualteActualPathDelay(weightedMatrixG, pathMatrix, actualPathDelayMatrix);
+	printMatrixDouble(actualPathDelayMatrix);*/
 
-		for (int j = 0;j < V;j++) {
-			for (int k = 0; k < V;k++) {
-				weightedMatrixPath[i][j][k] = p[j][k];
-			}
-		}
+	cout << "residualMatrix: \n";
+	printMatrix(residualMatrix);
 
-		for (int j = 0; j < V;j++) {
-			weightedMatrixShort[i][j] = dist[j];
-		}
-	}
+	updateEdgeTraffic(graph, EdgeTraffic, capacity,residualMatrix, weightedMatrixG, weightedMatrixPath, updatedShortestPath, pathMatrix, actualPathDelayMatrix);
+	cout << "Updated Edge Traffic: \n ";
+	printMatrix(EdgeTraffic);
 
-	cout << "Actual path delay: \n";
-	printMatrixDouble(weightedMatrixShort);
+	cout << " Updated weightedMatrixG: \n";
+	printMatrix(weightedMatrixG);
 
-	cout <<"Actual path matrix: \n";
-	printPathMatrix(weightedMatrixPath);
+	cout << " updatedShortestPath: \n";
+	printMatrix(updatedShortestPath);
+
+	cout << "Updated residualMatrix: \n";
+	printMatrix(residualMatrix);
+	/*calculatePredictedMatrix(graph, predictedMatrix);
+
+	cout << "predicted Matrix: \n";
+	printMatrixDouble(predictedMatrix);
+
+
+	cout << "new Flow: \n";
+	calcualteNewFlowMatrix(flow, newFlowMatrix, 0.1);
+	printMatrixDouble(newFlowMatrix);*/
+
 	return 0;
 }
